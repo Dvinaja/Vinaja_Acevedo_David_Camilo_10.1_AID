@@ -1,0 +1,124 @@
+Instalación de Librerias
+___________________________
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl start Docker
+
+Crear Archivos
+____________________
+vi app.py
+
+import subprocess
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route('/ejecutar-playbook', methods=['GET'])
+def ejecutar_playbook():
+    playbook_path = '/app/playbook.yml'  # Ruta dentro del contenedor, ajusta según sea necesario
+    try:
+        # Ejecutar el playbook usando subprocess
+        resultado = subprocess.run(['ansible-playbook','-i', '/app/hosts.ini', playbook_path], capture_output=True, text=True)
+        output = resultado.stdout
+        return jsonify({'status': 'success', 'output': output}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0')
+------------------------------------------------------------------------
+vi Dockerfile_
+
+# Usa una imagen base de Python
+FROM python:3.8-slim
+
+# Instala las dependencias necesarias
+RUN apt-get update && \
+    apt-get install -y \
+    ansible iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copia tu aplicación Flask al contenedor
+WORKDIR /app
+COPY . .
+
+# Instala las dependencias de Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expone el puerto en el que corre tu aplicación Flask
+EXPOSE 5000
+
+# Comando para ejecutar tu aplicación Flask
+CMD ["python", "app.py"]
+---------------------------------------------------------------------
+vi hosts.ini
+
+[all]
+192.168.13.128
+----------------------------------------------------------------------
+vi playbook.yml
+
+---
+- name: Ejecutar tarea en el host remoto
+  hosts: all
+  tasks:
+    - name: Imprimir un mensaje en la consola
+      debug:
+        msg: "Hello from Ansible"
+-----------------------------------------------------------------------
+vi requirements.txt
+
+Flask==2.0.1
+Werkzeug==2.0.1
+-----------------------------------------------------------------------
+En carpeta ansible
+_______________________
+vi buscar_carpeta_win.yml 
+- hosts win
+
+  tasks:
+
+  - name: Buscar carpeta
+    win_find:
+      paths: C:\{{ansible_date_time.date}}
+    register: result
+
+  - debug:
+      var: result.examined
+
+  - name: Crea Archivo
+    win_copy:
+      src: C:\ansible_examples\
+      dest:  C:\ansible_examples_bkp\
+      remote_src: yes
+    when: result_examined > 0
+---------------------------------------------------
+vi hosts 
+
+[win]
+192.168.217.131
+
+[win:vars]
+ansible_user=Administrador
+ansible_password=C135.
+ansible_ssh_port=5985
+ansible_connection=winrm
+ansible_winrm_transport=ntlm
+ansible_winrm_server_cert_validation=ignore
+
+Ejecutar en carpeta ansible
+______________________________
+ansible win -m win_ping 
+ansible-playbook collection install ansible.windows
+ansible-galaxy collection install ansible.windows --force*
+
+Ejecutar Docker en carpeta docker3
+____________________
+
+docker build -t flask-ansible .
+docker run -p 5000.5000 flask-ansible
+
+
+
+
